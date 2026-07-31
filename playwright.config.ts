@@ -9,10 +9,26 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
  *
  * Sandboxed CI images often ship a browser build that does not match the one
  * this Playwright version would download, and the download is usually blocked
- * anyway. Falling back to `undefined` lets Playwright resolve its own.
+ * anyway. Falling back to `undefined` lets Playwright resolve its own — on a
+ * normal machine that means `npx playwright install chromium`.
  */
 const PREINSTALLED_CHROME = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const executablePath = existsSync(PREINSTALLED_CHROME) ? PREINSTALLED_CHROME : undefined;
+const sandboxChrome = existsSync(PREINSTALLED_CHROME);
+const executablePath = sandboxChrome ? PREINSTALLED_CHROME : undefined;
+
+/**
+ * The scene needs WebGL. A headless sandbox has no GPU, so it has to fall back
+ * to SwiftShader — but forcing software rendering on a real machine only makes
+ * the suite slower, so those flags are applied only where they are needed.
+ */
+const gpuArgs = sandboxChrome
+  ? [
+      '--use-gl=angle',
+      '--use-angle=swiftshader',
+      '--enable-unsafe-swiftshader',
+      '--disable-gpu-sandbox',
+    ]
+  : [];
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -28,13 +44,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     launchOptions: {
       ...(executablePath ? { executablePath } : {}),
-      args: [
-        // Headless Chromium has no GPU, so WebGL runs on SwiftShader.
-        '--use-gl=angle',
-        '--use-angle=swiftshader',
-        '--enable-unsafe-swiftshader',
-        '--disable-gpu-sandbox',
-      ],
+      args: gpuArgs,
     },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

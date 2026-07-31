@@ -34,7 +34,18 @@ A personal, local-first take on [freemockup.video](https://www.freemockup.video/
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npx playwright install chromium   # only needed to run the e2e suite
+npm run dev                       # http://localhost:5173
+```
+
+Node 20+ is required (developed on 22). Works on Windows, macOS, and Linux —
+there are no shell-specific scripts.
+
+Restoring from a git bundle rather than a remote:
+
+```bash
+git clone path/to/freemockup-local.bundle freemockup-local
+cd freemockup-local
 ```
 
 ```bash
