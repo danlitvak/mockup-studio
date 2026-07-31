@@ -10,3 +10,10 @@ playwright-report/
 blob-report/
 .playwright/
 *.tsbuildinfo
+
+# Compiled output of the TypeScript configs. These must never be committed:
+# Vite resolves vite.config.js *before* vite.config.ts, so a stale copy
+# silently shadows the real config and edits to the .ts appear to do nothing.
+/vite.config.js
+/playwright.config.js
+
