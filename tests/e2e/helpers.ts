@@ -115,25 +115,30 @@ export async function snapshot(page: Page): Promise<StudioSnapshot> {
   });
 }
 
-/** Clear all local state so each spec starts from a known-empty machine. */
-export async function resetStorage(page: Page): Promise<void> {
+/**
+ * Open the app on a clean machine and wait until it has finished hydrating.
+ *
+ * Storage needs no explicit clearing: Playwright gives every test its own
+ * browser context, so IndexedDB and localStorage already start empty. Deleting
+ * the database from inside a loaded page is actively worse — the app holds an
+ * open connection, so `deleteDatabase` blocks and then fires at an
+ * unpredictable moment during the next test.
+ */
+export async function openApp(page: Page): Promise<void> {
   await page.goto('/');
-  await page.evaluate(async () => {
-    localStorage.clear();
-    const databases = (await indexedDB.databases?.()) ?? [];
-    await Promise.all(
-      databases
-        .map((entry) => entry.name)
-        .filter((name): name is string => Boolean(name))
-        .map(
-          (name) =>
-            new Promise<void>((resolve) => {
-              const request = indexedDB.deleteDatabase(name);
-              request.onsuccess = () => resolve();
-              request.onerror = () => resolve();
-              request.onblocked = () => resolve();
-            }),
-        ),
-    );
+  await page.locator('.app[data-hydrated="true"]').waitFor();
+}
+
+/**
+ * Wait until media is decoded and in memory.
+ *
+ * The dropzone hides as soon as loading *starts* (a spinner takes its place),
+ * so "dropzone is hidden" is not the same as "media is ready" — assert on the
+ * store instead.
+ */
+export async function waitForMedia(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const store = window.__studio;
+    return Boolean(store && store.getState().media !== null);
   });
 }

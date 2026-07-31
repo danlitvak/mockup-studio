@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { phoneScreenshot } from './fixtures.ts';
-import { pausePlayback, resetStorage, snapshot, stableCanvas } from './helpers.ts';
+import { openApp, pausePlayback, snapshot, stableCanvas, waitForMedia } from './helpers.ts';
 
 const ready = async (page: import('@playwright/test').Page) => {
   await expect(page.locator('.app')).toHaveAttribute('data-hydrated', 'true');
@@ -12,13 +12,11 @@ const importScreenshot = async (page: import('@playwright/test').Page, name = 's
     mimeType: 'image/png',
     buffer: phoneScreenshot(),
   });
-  await expect(page.getByTestId('dropzone')).toBeHidden();
+  await waitForMedia(page);
 };
 
 test.beforeEach(async ({ page }) => {
-  await resetStorage(page);
-  await page.goto('/');
-  await ready(page);
+  await openApp(page);
 });
 
 test.describe('local-first persistence', () => {
@@ -36,7 +34,7 @@ test.describe('local-first persistence', () => {
     await page.reload();
     await ready(page);
     // Media is read back out of IndexedDB and re-decoded.
-    await expect(page.getByTestId('dropzone')).toBeHidden();
+    await waitForMedia(page);
 
     const after = await snapshot(page);
     expect(after.projectId).toBe(before.projectId);
@@ -100,7 +98,7 @@ test.describe('local-first persistence', () => {
     await page.getByTestId('open-library').click();
     await page.getByTestId('library').getByText('With media').click();
     await expect(page.getByTestId('library')).toBeHidden();
-    await expect(page.getByTestId('dropzone')).toBeHidden();
+    await waitForMedia(page);
 
     const reopened = await snapshot(page);
     expect(reopened.projectId).toBe(withMedia.projectId);

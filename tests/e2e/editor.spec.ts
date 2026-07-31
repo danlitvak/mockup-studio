@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { phoneScreenshot, wideScreenshot } from './fixtures.ts';
-import { canvasStats, pausePlayback, resetStorage, snapshot, stableCanvas } from './helpers.ts';
+import {
+  canvasStats,
+  openApp,
+  pausePlayback,
+  snapshot,
+  stableCanvas,
+  waitForMedia,
+} from './helpers.ts';
 
 const importScreenshot = async (
   page: import('@playwright/test').Page,
@@ -12,13 +19,11 @@ const importScreenshot = async (
     mimeType: 'image/png',
     buffer,
   });
-  await expect(page.getByTestId('dropzone')).toBeHidden();
+  await waitForMedia(page);
 };
 
 test.beforeEach(async ({ page }) => {
-  await resetStorage(page);
-  await page.goto('/');
-  await expect(page.locator('.app')).toHaveAttribute('data-hydrated', 'true');
+  await openApp(page);
 });
 
 test.describe('editor', () => {

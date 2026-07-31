@@ -78,35 +78,45 @@ function readTheme(): Theme {
  * the debounce window.
  */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingProject: Project | null = null;
-let onSavedCallback: (() => void) | null = null;
+let dirty = false;
 
-function scheduleSave(project: Project, onSaved: () => void): void {
-  pendingProject = project;
-  onSavedCallback = onSaved;
+/**
+ * Writes are serialised through one chain, and each write reads the project
+ * from the store at the moment it runs rather than capturing a snapshot when
+ * it was queued.
+ *
+ * Both details matter. Two writes for the same project can otherwise be in
+ * flight at once — an import flushing while a rename is debounced, say — and
+ * because IndexedDB gives no ordering guarantee across transactions, the older
+ * snapshot can land last and silently undo the newer edit.
+ */
+let saveChain: Promise<void> = Promise.resolve();
+
+function scheduleSave(): void {
+  dirty = true;
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    void flushSave();
-  }, 400);
+  saveTimer = setTimeout(() => void flushSave(), 400);
 }
 
-async function flushSave(): Promise<void> {
+function flushSave(): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  const project = pendingProject;
-  const onSaved = onSavedCallback;
-  pendingProject = null;
-  onSavedCallback = null;
-  if (!project) return;
+  if (!dirty) return saveChain;
+  dirty = false;
 
-  try {
-    await db.saveProject(project);
-    onSaved?.();
-  } catch (error) {
-    console.warn('[storage] save failed', error);
-  }
+  saveChain = saveChain.then(async () => {
+    // Read late: whatever the project looks like now is what belongs on disk.
+    const project = useStudio.getState().project;
+    try {
+      await db.saveProject(project);
+      await useStudio.getState().refreshLibrary();
+    } catch (error) {
+      console.warn('[storage] save failed', error);
+    }
+  });
+  return saveChain;
 }
 
 /** Persist the current project, then drop any media no project still points at. */
@@ -125,9 +135,8 @@ if (typeof window !== 'undefined') {
 
 export const useStudio = create<StudioState>((set, get) => {
   const touch = (project: Project): Project => {
-    const next = { ...project, updatedAt: Date.now() };
-    scheduleSave(next, () => void get().refreshLibrary());
-    return next;
+    scheduleSave();
+    return { ...project, updatedAt: Date.now() };
   };
 
   return {

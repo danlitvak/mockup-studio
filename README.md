@@ -54,17 +54,22 @@ npm run test:e2e     # end-to-end in real Chromium (Playwright)
 npm run check        # all of the above, in order
 ```
 
-**225 unit tests** cover the pure core — motion, framing, fit, gradients, project migration, export
-planning. **27 end-to-end tests** drive a real browser: they read pixels back off the WebGL canvas to
+**226 unit tests** cover the pure core — motion, framing, fit, gradients, project migration, export
+planning. **28 end-to-end tests** drive a real browser: they read pixels back off the WebGL canvas to
 prove the scene actually changed, and they encode real video files and decode them again to check
 dimensions and duration.
 
-Two properties worth calling out, because they are the ones that are easy to get subtly wrong:
+Three properties worth calling out, because they are the ones that are easy to get subtly wrong:
 
 - **Seamless loops.** Cyclic presets satisfy `f(0) == f(1)` modulo a full turn, and frame `i` of `N`
   maps to `t = i/N` — never `i/(N-1)` — so the last frame stops short of repeating the first.
 - **Intros land at rest.** One-shot presets satisfy `f(1) == restingPose` exactly. The e2e suite
   checks this through the real renderer: a `tilt-in` at `t = 1` is pixel-identical to a `still` render.
+- **Saves cannot clobber each other.** Writes are serialised through a single chain, and each write
+  reads the project at the moment it runs rather than capturing a snapshot when it was queued.
+  Without both, two in-flight writes for the same project — an import flushing while a rename is
+  still debounced — can land out of order and silently undo the newer edit. IndexedDB gives no
+  cross-transaction ordering guarantee, so this has to be handled in the store.
 
 ## Architecture
 

@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { detectContainer, phoneScreenshot } from './fixtures.ts';
-import { resetStorage, snapshot } from './helpers.ts';
+import { openApp, snapshot, waitForMedia } from './helpers.ts';
 
 type Format = 'mp4' | 'webm';
 
@@ -29,7 +29,7 @@ const importScreenshot = async (page: Page) => {
     mimeType: 'image/png',
     buffer: phoneScreenshot(),
   });
-  await expect(page.getByTestId('dropzone')).toBeHidden();
+  await waitForMedia(page);
 };
 
 /** Probe once so the suite can skip codec paths this browser cannot run. */
@@ -52,9 +52,7 @@ const encodableFormats = async (page: Page) =>
   });
 
 test.beforeEach(async ({ page }) => {
-  await resetStorage(page);
-  await page.goto('/');
-  await expect(page.locator('.app')).toHaveAttribute('data-hydrated', 'true');
+  await openApp(page);
 });
 
 test.describe('export', () => {
