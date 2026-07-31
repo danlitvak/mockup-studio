@@ -9,7 +9,7 @@ import {
 } from 'mediabunny';
 import { bitrateFor, codecFor, exportFilename, mimeFor } from '../core/export-config.ts';
 import { frameCount, resolveResolution, timeForFrame } from '../core/framing.ts';
-import { isCyclic } from '../core/motion.ts';
+import { isSeamlessLoop } from '../core/motion.ts';
 import { effectiveDuration } from '../core/project.ts';
 import type { ExportFormat, Project } from '../core/types.ts';
 import { seekVideo } from '../media/load.ts';
@@ -92,7 +92,7 @@ export async function exportVideo(request: ExportRequest): Promise<ExportResult>
   const duration = effectiveDuration(project);
   const fps = project.output.fps;
   const total = frameCount(duration, fps);
-  const seamless = isCyclic(project.motion.preset) && project.motion.loop;
+  const seamless = isSeamlessLoop(project.motion);
   const format = project.output.format;
   const bitrate = bitrateFor(width, height, fps, project.output.quality);
 

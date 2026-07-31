@@ -1,4 +1,5 @@
 import { DEG, easeInOutCubic, easeOutBack, easeOutCubic, lerp, window01 } from './easing.ts';
+import { applyKeyframePose, sampleKeyframes } from './keyframes.ts';
 import type { MotionId, MotionSettings, SceneSettings, Transform } from './types.ts';
 
 /**
@@ -36,6 +37,22 @@ export const MOTION_LABELS: Record<MotionId, string> = {
 const CYCLIC: ReadonlySet<MotionId> = new Set<MotionId>(['still', 'float', 'spin', 'orbit', 'pan']);
 
 export const isCyclic = (preset: MotionId): boolean => CYCLIC.has(preset);
+
+/** True when the motion actually has a keyframe track to evaluate. */
+export const usesKeyframes = (motion: MotionSettings): boolean =>
+  motion.mode === 'keyframes' && motion.keyframes.length > 0;
+
+/**
+ * Whether the clip is meant to tile without a seam, which decides whether the
+ * last frame stops short of repeating the first.
+ *
+ * Asking `isCyclic(preset)` is not enough once keyframes exist: a looping track
+ * is seamless whatever the preset happens to be set to, and a track is not
+ * cyclic just because the preset behind it is. Export and framing both need
+ * this answer, so it lives here rather than being re-derived at each call site.
+ */
+export const isSeamlessLoop = (motion: MotionSettings): boolean =>
+  motion.loop && (usesKeyframes(motion) || isCyclic(motion.preset));
 
 export const isDeviceMotionId = (value: unknown): value is MotionId =>
   typeof value === 'string' && (MOTION_IDS as string[]).includes(value);
@@ -77,6 +94,16 @@ export function evaluateMotion(
   t: number,
 ): Transform {
   const out = restingTransform(scene);
+
+  // A keyframe track replaces the preset rather than layering on top of it:
+  // two independent things moving the same device reads as a fault, not a
+  // feature. `amount` and `speed` belong to the presets and do not apply here —
+  // a keyframe already says exactly where the device should be.
+  if (usesKeyframes(motion)) {
+    const pose = sampleKeyframes(motion.keyframes, t, motion.loop);
+    return pose ? applyKeyframePose(out, pose) : out;
+  }
+
   const amount = Number.isFinite(motion.amount) ? Math.max(0, motion.amount) : 1;
   if (amount === 0 || motion.preset === 'still') return out;
 

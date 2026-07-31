@@ -1,4 +1,11 @@
 import { create } from 'zustand';
+import { clamp01 } from '../core/easing.ts';
+import {
+  MAX_KEYFRAMES,
+  defaultKeyframe,
+  sampleKeyframes,
+  sortKeyframes,
+} from '../core/keyframes.ts';
 import {
   createMotionPreset,
   presetKey,
@@ -8,6 +15,7 @@ import {
 } from '../core/presets.ts';
 import { createProject, effectiveDuration, normalizeProject } from '../core/project.ts';
 import type {
+  Keyframe,
   MotionSettings,
   OutputSettings,
   Project,
@@ -59,6 +67,10 @@ interface StudioState {
   openProject: (id: string) => Promise<void>;
   removeProject: (id: string) => Promise<void>;
   refreshLibrary: () => Promise<void>;
+  /** Add a pose at the playhead, capturing where the device is right now. */
+  addKeyframe: () => void;
+  updateKeyframe: (index: number, patch: Partial<Keyframe>) => void;
+  removeKeyframe: (index: number) => void;
   saveMotionPreset: (name: string) => Promise<void>;
   applyMotionPreset: (id: string) => void;
   removeMotionPreset: (id: string) => Promise<void>;
@@ -342,6 +354,77 @@ export const useStudio = create<StudioState>((set, get) => {
     async refreshLibrary() {
       if (!get().storageAvailable) return;
       set({ library: await db.listProjects() });
+    },
+
+    /**
+     * Add a pose at the playhead.
+     *
+     * The new keyframe captures where the device already is at that instant,
+     * so adding one never makes the animation jump — it just gives the user a
+     * handle on a moment that was previously being interpolated through. On an
+     * empty track that means the resting pose, which is zero offsets.
+     */
+    addKeyframe() {
+      set((state) => {
+        const { motion } = state.project;
+        if (motion.keyframes.length >= MAX_KEYFRAMES) return {};
+
+        const t = clamp01(state.playhead);
+        const pose = sampleKeyframes(motion.keyframes, t, motion.loop);
+        const keyframe: Keyframe = { ...defaultKeyframe(t), ...(pose ?? {}), t };
+
+        // Replace rather than stack when one already sits at this instant:
+        // two keyframes at the same time make the earlier unreachable.
+        const kept = motion.keyframes.filter((existing) => Math.abs(existing.t - t) > 1e-4);
+        return {
+          project: touch({
+            ...state.project,
+            motion: {
+              ...motion,
+              mode: 'keyframes',
+              keyframes: sortKeyframes([...kept, keyframe]),
+            },
+          }),
+        };
+      });
+    },
+
+    updateKeyframe(index, patch) {
+      set((state) => {
+        const { motion } = state.project;
+        const current = motion.keyframes[index];
+        if (!current) return {};
+        const next = { ...current, ...patch };
+        // Moving a keyframe in time can reorder the track, and evaluation
+        // depends on that order.
+        return {
+          project: touch({
+            ...state.project,
+            motion: {
+              ...motion,
+              keyframes: sortKeyframes(
+                motion.keyframes.map((frame, i) => (i === index ? next : frame)),
+              ),
+            },
+          }),
+        };
+      });
+    },
+
+    removeKeyframe(index) {
+      set((state) => {
+        const { motion } = state.project;
+        if (!motion.keyframes[index]) return {};
+        return {
+          project: touch({
+            ...state.project,
+            motion: {
+              ...motion,
+              keyframes: motion.keyframes.filter((_, i) => i !== index),
+            },
+          }),
+        };
+      });
     },
 
     /**

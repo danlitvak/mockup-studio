@@ -72,14 +72,51 @@ export interface SceneSettings {
   lightIntensity: number;
 }
 
+export type MotionMode = 'preset' | 'keyframes';
+
+export type EasingId = 'linear' | 'ease-in-out' | 'ease-out' | 'ease-in' | 'back';
+
+/**
+ * One pose on the keyframe track.
+ *
+ * Every channel is an offset from the resting pose rather than an absolute
+ * value, which is the same convention the built-in presets follow. It means the
+ * scene's own rotation, scale and offset controls keep working underneath a
+ * keyframed animation instead of being overridden by it.
+ */
+export interface Keyframe {
+  /** Normalised time along the clip, 0..1. */
+  t: number;
+  /** Position offset, in scene units. */
+  x: number;
+  y: number;
+  z: number;
+  /** Rotation offset, in degrees. */
+  rotationX: number;
+  rotationY: number;
+  rotationZ: number;
+  /** Scale multiplier applied on top of the scene's scale. */
+  scale: number;
+  /** How the track eases *into* this keyframe from the one before it. */
+  easing: EasingId;
+}
+
 export interface MotionSettings {
+  /**
+   * Which description of the motion is in charge. Held explicitly rather than
+   * inferred from whether `keyframes` is empty, so that switching back to a
+   * preset does not mean throwing the keyframe track away.
+   */
+  mode: MotionMode;
   preset: MotionId;
   /** Intensity multiplier, 0..2. */
   amount: number;
   /** Number of cycles across the clip for looping presets; quantised to an integer. */
   speed: number;
-  /** Whether looping presets should tile seamlessly. */
+  /** Whether the motion should tile seamlessly — applies to both modes. */
   loop: boolean;
+  /** Poses along the clip, sorted by time. Only used in `keyframes` mode. */
+  keyframes: Keyframe[];
 }
 
 export interface OutputSettings {

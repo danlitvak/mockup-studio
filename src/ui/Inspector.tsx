@@ -6,9 +6,17 @@ import { QUALITY_IDS, QUALITY_LABELS, bitrateFor, estimateBytes, formatBytes } f
 import { FPS_OPTIONS, MAX_DURATION, MIN_DURATION, effectiveDuration } from '../core/project.ts';
 import { ACCEPT_ATTRIBUTE } from '../media/load.ts';
 import { useStudio } from '../state/store.ts';
-import type { AspectId, DeviceId, MotionId, QualityId, ResolutionId } from '../core/types.ts';
+import type {
+  AspectId,
+  DeviceId,
+  MotionId,
+  MotionMode,
+  QualityId,
+  ResolutionId,
+} from '../core/types.ts';
 import { ColorInput, Panel, Segmented, Select, Slider, Toggle } from './controls.tsx';
 import { ExportPanel } from './ExportPanel.tsx';
+import { KeyframeEditor } from './KeyframeEditor.tsx';
 import { MotionPresets } from './MotionPresets.tsx';
 import { useFormatSupport } from './useFormatSupport.ts';
 
@@ -248,45 +256,66 @@ export function Inspector(): React.JSX.Element {
       </Panel>
 
       <Panel title="Motion">
-        <Select<MotionId>
-          label="Preset"
-          value={motion.preset}
-          testId="motion-select"
-          options={MOTION_IDS.map((id) => ({ value: id, label: MOTION_LABELS[id] }))}
-          onChange={(preset) => patchMotion({ preset })}
+        <Segmented<MotionMode>
+          label="Source"
+          value={motion.mode}
+          testId="motion-mode"
+          options={[
+            { value: 'preset', label: 'Preset' },
+            { value: 'keyframes', label: 'Keyframes' },
+          ]}
+          onChange={(mode) => patchMotion({ mode })}
         />
-        <Slider
-          label="Amount"
-          value={motion.amount}
-          min={0}
-          max={2}
-          step={0.01}
-          testId="motion-amount"
-          format={(v) => `${Math.round(v * 100)}%`}
-          onChange={(amount) => patchMotion({ amount })}
-        />
-        {isCyclic(motion.preset) && (
+
+        {motion.mode === 'preset' ? (
           <>
+            <Select<MotionId>
+              label="Preset"
+              value={motion.preset}
+              testId="motion-select"
+              options={MOTION_IDS.map((id) => ({ value: id, label: MOTION_LABELS[id] }))}
+              onChange={(preset) => patchMotion({ preset })}
+            />
             <Slider
-              label="Cycles"
-              value={motion.speed}
-              min={1}
-              max={6}
-              step={motion.loop ? 1 : 0.25}
-              format={(v) => `${motion.loop ? Math.round(v) : v.toFixed(2)}×`}
-              onChange={(speed) => patchMotion({ speed })}
+              label="Amount"
+              value={motion.amount}
+              min={0}
+              max={2}
+              step={0.01}
+              testId="motion-amount"
+              format={(v) => `${Math.round(v * 100)}%`}
+              onChange={(amount) => patchMotion({ amount })}
             />
-            <Toggle
-              label="Seamless loop"
-              checked={motion.loop}
-              testId="loop-toggle"
-              onChange={(loop) => patchMotion({ loop })}
-            />
+            {isCyclic(motion.preset) && (
+              <Slider
+                label="Cycles"
+                value={motion.speed}
+                min={1}
+                max={6}
+                step={motion.loop ? 1 : 0.25}
+                format={(v) => `${motion.loop ? Math.round(v) : v.toFixed(2)}×`}
+                onChange={(speed) => patchMotion({ speed })}
+              />
+            )}
+            {!isCyclic(motion.preset) && (
+              <p className="panel__note">A one-shot intro — it settles into the resting pose.</p>
+            )}
           </>
+        ) : (
+          <KeyframeEditor />
         )}
-        {!isCyclic(motion.preset) && (
-          <p className="panel__note">A one-shot intro — it settles into the resting pose.</p>
+
+        {/* Looping applies to both sources, so it sits outside the switch —
+            except for one-shot presets, which have nothing to loop. */}
+        {(motion.mode === 'keyframes' || isCyclic(motion.preset)) && (
+          <Toggle
+            label="Seamless loop"
+            checked={motion.loop}
+            testId="loop-toggle"
+            onChange={(loop) => patchMotion({ loop })}
+          />
         )}
+
         <MotionPresets />
       </Panel>
 

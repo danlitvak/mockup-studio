@@ -849,3 +849,90 @@ input[type='range']:disabled {
 .text-input::placeholder {
   color: var(--text-dim);
 }
+
+/* Keyframe track editor. */
+
+.keyframes {
+  display: grid;
+  gap: 12px;
+}
+
+.keyframes__track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--text);
+}
+
+.chip.is-active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.keyframes__actions {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.keyframes__actions > .button--block {
+  flex: 1;
+}
+
+.keyframes__editor {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* Keyframe markers under the scrubber. */
+
+.timeline__scrubber {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline__scrubber > .timeline__scrub {
+  width: 100%;
+}
+
+.timeline__markers {
+  position: relative;
+  height: 6px;
+  margin-top: 2px;
+  pointer-events: none;
+}
+
+/* A range input insets its thumb by half its width at each end, so the centre
+   of the thumb never reaches the element's edges. The markers are inset to
+   match — otherwise one at 0% or 100% sits slightly off the end of the path the
+   playhead can actually travel. The thumb is 14px, hence the 7px. */
+.timeline__marker {
+  position: absolute;
+  top: 0;
+  left: calc(7px + (100% - 14px) * var(--marker-fraction));
+  width: 2px;
+  height: 6px;
+  margin-left: -1px;
+  background: var(--accent);
+  border-radius: 1px;
+}

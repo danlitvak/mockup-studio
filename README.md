@@ -25,7 +25,9 @@ A personal, local-first take on [freemockup.video](https://www.freemockup.video/
 | Fit | `Fill` crops to the screen, `Contain` letterboxes — defaults per device shape |
 | Scene | Body colour, scale, three rotation axes, X/Y offset, drop shadow, light intensity |
 | Background | Gradient (any angle), solid, or transparent, plus six presets |
-| Motion | `still`, `float`, `spin`, `orbit`, `pan` (seamless loops) and `tilt-in`, `push-in`, `flip-in` (one-shot intros) |
+| Motion | `still`, `float`, `spin`, `orbit`, `pan` (seamless loops) and `tilt-in`, `push-in`, `flip-in` (one-shot intros) — or keyframe your own |
+| Keyframes | Poses at chosen times, five easings, seamless wrap; markers on the timeline |
+| Presets | Save any motion under a name and reuse it |
 | Output | 16:9, 9:16, 1:1, 4:5, 21:9 at 720p/1080p/1440p/4K, 24/30/60 fps, up to 60s |
 | Export | MP4 (H.264) or WebM (VP9), plus single-frame PNG |
 | Editor | Live preview, click or spacebar to play/pause, timeline scrubbing, light/dark theme, project library |
@@ -65,8 +67,8 @@ npm run test:e2e     # end-to-end in real Chromium (Playwright)
 npm run check        # all of the above, in order
 ```
 
-**239 unit tests** cover the pure core — motion, framing, fit, device geometry, gradients, project
-migration, export planning. **37 end-to-end tests** drive a real browser: they read pixels back off
+**283 unit tests** cover the pure core — motion, keyframes, framing, fit, device geometry, gradients,
+saved presets, project migration, export planning. **49 end-to-end tests** drive a real browser: they read pixels back off
 the WebGL canvas to prove the scene actually changed, and they encode real video files and decode
 them again to check dimensions and duration. The encode test runs once per container, so H.264 is
 exercised wherever the browser has an encoder for it rather than always deferring to VP9; for MP4 the
@@ -83,7 +85,9 @@ One more property is worth calling out, because the obvious test for it does not
 Three properties worth calling out, because they are the ones that are easy to get subtly wrong:
 
 - **Seamless loops.** Cyclic presets satisfy `f(0) == f(1)` modulo a full turn, and frame `i` of `N`
-  maps to `t = i/N` — never `i/(N-1)` — so the last frame stops short of repeating the first.
+  maps to `t = i/N` — never `i/(N-1)` — so the last frame stops short of repeating the first. A
+  looping keyframe track gets the same property for free, by being evaluated as cyclic over `[0, 1)`
+  with the span from the last pose round to the first treated as just another segment.
 - **Intros land at rest.** One-shot presets satisfy `f(1) == restingPose` exactly. The e2e suite
   checks this through the real renderer: a `tilt-in` at `t = 1` is pixel-identical to a `still` render.
 - **Saves cannot clobber each other.** Writes are serialised through a single chain, and each write
@@ -100,6 +104,8 @@ src/
     types.ts        Project schema
     project.ts      Defaults, tolerant migration, clamping
     motion.ts       evaluateMotion(motion, scene, t) -> Transform
+    keyframes.ts    Keyframe track sampling, easings, seamless wrap
+    presets.ts      Saved motion configurations
     framing.ts      Aspect/resolution maths, camera fit, frame timing
     devices.ts      Device geometry specs
     fit.ts          cover/contain rect maths

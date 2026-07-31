@@ -1,15 +1,19 @@
 import { DEVICE_IDS } from './devices.ts';
 import { ASPECT_IDS, RESOLUTION_IDS } from './framing.ts';
+import { EASING_IDS, MAX_KEYFRAMES, defaultKeyframe, sortKeyframes } from './keyframes.ts';
 import { MOTION_IDS } from './motion.ts';
 import { QUALITY_IDS } from './export-config.ts';
 import type {
   AspectId,
   Background,
   DeviceId,
+  EasingId,
   ExportFormat,
   FitMode,
+  Keyframe,
   MediaRef,
   MotionId,
+  MotionMode,
   MotionSettings,
   Project,
   QualityId,
@@ -105,10 +109,12 @@ export const defaultScene = (): SceneSettings => ({
 });
 
 export const defaultMotion = (): MotionSettings => ({
+  mode: 'preset',
   preset: 'float',
   amount: 1,
   speed: 1,
   loop: true,
+  keyframes: [],
 });
 
 export const defaultOutput = (): OutputSettings => ({
@@ -170,15 +176,40 @@ function migrateScene(raw: unknown): SceneSettings {
   };
 }
 
+function migrateKeyframe(raw: unknown): Keyframe {
+  const d = defaultKeyframe();
+  if (!isRecord(raw)) return d;
+  return {
+    t: num(raw.t, d.t, 0, 1),
+    x: num(raw.x, d.x, -8, 8),
+    y: num(raw.y, d.y, -8, 8),
+    z: num(raw.z, d.z, -8, 8),
+    rotationX: num(raw.rotationX, d.rotationX, -360, 360),
+    rotationY: num(raw.rotationY, d.rotationY, -360, 360),
+    rotationZ: num(raw.rotationZ, d.rotationZ, -360, 360),
+    scale: num(raw.scale, d.scale, 0.05, 4),
+    easing: oneOf<EasingId>(raw.easing, EASING_IDS, d.easing),
+  };
+}
+
+function migrateKeyframes(raw: unknown): Keyframe[] {
+  if (!Array.isArray(raw)) return [];
+  // Sorted here rather than trusted, because evaluation depends on the order
+  // and this is the boundary where arbitrary data comes in.
+  return sortKeyframes(raw.slice(0, MAX_KEYFRAMES).map(migrateKeyframe));
+}
+
 /** Exported because saved motion presets carry a MotionSettings of their own. */
 export function migrateMotion(raw: unknown): MotionSettings {
   const d = defaultMotion();
   if (!isRecord(raw)) return d;
   return {
+    mode: oneOf<MotionMode>(raw.mode, ['preset', 'keyframes'] as const, d.mode),
     preset: oneOf<MotionId>(raw.preset, MOTION_IDS, d.preset),
     amount: num(raw.amount, d.amount, 0, 2),
     speed: num(raw.speed, d.speed, 0.25, 6),
     loop: bool(raw.loop, d.loop),
+    keyframes: migrateKeyframes(raw.keyframes),
   };
 }
 
