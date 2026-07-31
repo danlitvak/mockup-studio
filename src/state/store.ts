@@ -1,4 +1,11 @@
 import { create } from 'zustand';
+import {
+  createMotionPreset,
+  presetKey,
+  removePreset,
+  upsertPreset,
+  type MotionPreset,
+} from '../core/presets.ts';
 import { createProject, effectiveDuration, normalizeProject } from '../core/project.ts';
 import type {
   MotionSettings,
@@ -35,6 +42,8 @@ interface StudioState {
   theme: Theme;
   exportJob: ExportJob | null;
   library: Project[];
+  /** Motion configurations the user has saved, newest first. */
+  motionPresets: MotionPreset[];
   storageAvailable: boolean;
   hydrated: boolean;
 
@@ -50,6 +59,9 @@ interface StudioState {
   openProject: (id: string) => Promise<void>;
   removeProject: (id: string) => Promise<void>;
   refreshLibrary: () => Promise<void>;
+  saveMotionPreset: (name: string) => Promise<void>;
+  applyMotionPreset: (id: string) => void;
+  removeMotionPreset: (id: string) => Promise<void>;
   setPlaying: (playing: boolean) => void;
   setPlayhead: (playhead: number) => void;
   setTheme: (theme: Theme) => void;
@@ -149,6 +161,7 @@ export const useStudio = create<StudioState>((set, get) => {
     theme: 'dark',
     exportJob: null,
     library: [],
+    motionPresets: [],
     storageAvailable: true,
     hydrated: false,
 
@@ -171,6 +184,9 @@ export const useStudio = create<StudioState>((set, get) => {
       }
 
       void db.requestPersistence();
+      // Presets are independent of any project, so a failure to read them must
+      // not stop the editor opening.
+      set({ motionPresets: await db.listMotionPresets().catch(() => []) });
       const projects = await db.listProjects();
 
       if (projects.length === 0) {
@@ -326,6 +342,50 @@ export const useStudio = create<StudioState>((set, get) => {
     async refreshLibrary() {
       if (!get().storageAvailable) return;
       set({ library: await db.listProjects() });
+    },
+
+    /**
+     * Keep the current motion under a name.
+     *
+     * The list is updated first and persisted second, so the picker responds
+     * immediately and a storage failure costs the write rather than the edit.
+     * Saving over an existing name replaces it — see `upsertPreset`.
+     */
+    async saveMotionPreset(name) {
+      const preset = createMotionPreset(name, get().project.motion);
+      const presets = upsertPreset(get().motionPresets, preset);
+      // `upsertPreset` reuses the id of a preset it replaced, so the record
+      // written here overwrites that row rather than orphaning it. It also
+      // guarantees exactly one entry per name, which is what makes this lookup
+      // exact.
+      const saved = presets.find(
+        (candidate) => presetKey(candidate.name) === presetKey(preset.name),
+      );
+      set({ motionPresets: presets });
+      if (!get().storageAvailable || !saved) return;
+      try {
+        await db.saveMotionPreset(saved);
+      } catch (error) {
+        console.warn('[storage] could not save the motion preset', error);
+      }
+    },
+
+    applyMotionPreset(id) {
+      const preset = get().motionPresets.find((candidate) => candidate.id === id);
+      if (!preset) return;
+      // Straight through patchMotion, so this is saved and clamped exactly like
+      // any other motion edit.
+      get().patchMotion(preset.motion);
+    },
+
+    async removeMotionPreset(id) {
+      set({ motionPresets: removePreset(get().motionPresets, id) });
+      if (!get().storageAvailable) return;
+      try {
+        await db.deleteMotionPreset(id);
+      } catch (error) {
+        console.warn('[storage] could not delete the motion preset', error);
+      }
     },
 
     setPlaying(playing) {

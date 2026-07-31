@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { migrateMotionPreset, type MotionPreset } from '../core/presets.ts';
 import { migrateProject } from '../core/project.ts';
 import type { Project } from '../core/types.ts';
 
@@ -26,10 +27,15 @@ interface StudioDB extends DBSchema {
     key: string;
     value: StoredMedia;
   };
+  motionPresets: {
+    key: string;
+    value: MotionPreset;
+  };
 }
 
 const DB_NAME = 'mockup-studio';
-const DB_VERSION = 1;
+/** Bumped to 2 when saved motion presets were added. */
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<StudioDB>> | null = null;
 
@@ -43,6 +49,11 @@ function getDB(): Promise<IDBPDatabase<StudioDB>> {
         }
         if (!db.objectStoreNames.contains('media')) {
           db.createObjectStore('media', { keyPath: 'id' });
+        }
+        // Guarded rather than versioned so the same block serves a database
+        // being created from nothing and one being upgraded from version 1.
+        if (!db.objectStoreNames.contains('motionPresets')) {
+          db.createObjectStore('motionPresets', { keyPath: 'id' });
         }
       },
       blocked() {
@@ -119,6 +130,27 @@ export async function collectGarbage(): Promise<number> {
     }
   }
   return removed;
+}
+
+export async function listMotionPresets(): Promise<MotionPreset[]> {
+  const db = await getDB();
+  const all = await db.getAll('motionPresets');
+  // A record that will not coerce is dropped rather than allowed to break the
+  // whole list, which is the same bargain the project migration makes.
+  return all
+    .map(migrateMotionPreset)
+    .filter((preset): preset is MotionPreset => preset !== null)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function saveMotionPreset(preset: MotionPreset): Promise<void> {
+  const db = await getDB();
+  await db.put('motionPresets', preset);
+}
+
+export async function deleteMotionPreset(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('motionPresets', id);
 }
 
 export interface StorageUsage {

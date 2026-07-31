@@ -9,6 +9,7 @@ import { useStudio } from '../state/store.ts';
 import type { AspectId, DeviceId, MotionId, QualityId, ResolutionId } from '../core/types.ts';
 import { ColorInput, Panel, Segmented, Select, Slider, Toggle } from './controls.tsx';
 import { ExportPanel } from './ExportPanel.tsx';
+import { MotionPresets } from './MotionPresets.tsx';
 import { useFormatSupport } from './useFormatSupport.ts';
 
 const BACKGROUND_PRESETS = [
@@ -286,6 +287,7 @@ export function Inspector(): React.JSX.Element {
         {!isCyclic(motion.preset) && (
           <p className="panel__note">A one-shot intro — it settles into the resting pose.</p>
         )}
+        <MotionPresets />
       </Panel>
 
       <Panel title="Output">

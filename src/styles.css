@@ -809,3 +809,43 @@ input[type='range']:disabled {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* Saved motion presets, inside the Motion panel. */
+
+.presets {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.presets__row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* The select and the input take the space; their buttons stay their own size. */
+.presets__row > .select,
+.presets__row > .text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.presets__row > .button {
+  flex: none;
+}
+
+.text-input {
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.text-input::placeholder {
+  color: var(--text-dim);
+}

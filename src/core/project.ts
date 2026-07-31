@@ -170,7 +170,8 @@ function migrateScene(raw: unknown): SceneSettings {
   };
 }
 
-function migrateMotion(raw: unknown): MotionSettings {
+/** Exported because saved motion presets carry a MotionSettings of their own. */
+export function migrateMotion(raw: unknown): MotionSettings {
   const d = defaultMotion();
   if (!isRecord(raw)) return d;
   return {
