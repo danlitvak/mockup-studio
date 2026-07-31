@@ -28,7 +28,7 @@ A personal, local-first take on [freemockup.video](https://www.freemockup.video/
 | Motion | `still`, `float`, `spin`, `orbit`, `pan` (seamless loops) and `tilt-in`, `push-in`, `flip-in` (one-shot intros) |
 | Output | 16:9, 9:16, 1:1, 4:5, 21:9 at 720p/1080p/1440p/4K, 24/30/60 fps, up to 60s |
 | Export | MP4 (H.264) or WebM (VP9), plus single-frame PNG |
-| Editor | Live preview, timeline scrubbing, spacebar playback, light/dark theme, project library |
+| Editor | Live preview, click or spacebar to play/pause, timeline scrubbing, light/dark theme, project library |
 
 ## Getting started
 
@@ -65,12 +65,20 @@ npm run test:e2e     # end-to-end in real Chromium (Playwright)
 npm run check        # all of the above, in order
 ```
 
-**226 unit tests** cover the pure core — motion, framing, fit, gradients, project migration, export
-planning. **29 end-to-end tests** drive a real browser: they read pixels back off the WebGL canvas to
-prove the scene actually changed, and they encode real video files and decode them again to check
-dimensions and duration. The encode test runs once per container, so H.264 is exercised wherever the
-browser has an encoder for it rather than always deferring to VP9; for MP4 the suite also walks the
-container's boxes to confirm the track really is `avc1` and holds exactly the expected frame count.
+**239 unit tests** cover the pure core — motion, framing, fit, device geometry, gradients, project
+migration, export planning. **37 end-to-end tests** drive a real browser: they read pixels back off
+the WebGL canvas to prove the scene actually changed, and they encode real video files and decode
+them again to check dimensions and duration. The encode test runs once per container, so H.264 is
+exercised wherever the browser has an encoder for it rather than always deferring to VP9; for MP4 the
+suite also walks the container's boxes to confirm the track really is `avc1` and holds exactly the
+expected frame count.
+
+One more property is worth calling out, because the obvious test for it does not work:
+
+- **Media keeps its aspect ratio**, by whatever route the editor reached the current device. Asking
+  "does the media fill the screen" cannot catch stretching — media drawn with `cover` fills the
+  screen whether or not its aspect survived. So the suite renders a source image with a square drawn
+  on it and measures whether it comes back out square.
 
 Three properties worth calling out, because they are the ones that are easy to get subtly wrong:
 

@@ -192,6 +192,22 @@ test.describe('editor', () => {
     expect((await snapshot(page)).playhead).toBe(paused);
   });
 
+  test('clicking the preview toggles playback', async ({ page }) => {
+    await importScreenshot(page);
+    const before = (await snapshot(page)).playing;
+
+    await page.getByTestId('preview-canvas').click();
+    expect((await snapshot(page)).playing).toBe(!before);
+
+    await page.getByTestId('preview-canvas').click();
+    expect((await snapshot(page)).playing).toBe(before);
+
+    // The click leaves the canvas focused, which is exactly where a control
+    // that also claimed Space would toggle twice and look inert.
+    await page.keyboard.press('Space');
+    expect((await snapshot(page)).playing).toBe(!before);
+  });
+
   test('scrubbing pauses playback and moves the playhead', async ({ page }) => {
     await importScreenshot(page);
     await page.getByTestId('scrubber').fill('0.6');

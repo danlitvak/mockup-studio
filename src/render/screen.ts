@@ -78,6 +78,14 @@ export class ScreenSurface {
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
+      // A texture's GPU storage is allocated once, from the size of its image at
+      // the first upload, and thereafter `needsUpdate` only sub-images into that
+      // same allocation. A canvas that changes shape therefore keeps being
+      // squeezed into the first device's texture and renders visibly stretched.
+      // Disposing forces a fresh allocation at the new size on the next render;
+      // the texture object itself stays valid, so materials keep working.
+      // Device changes are user-driven and rare, so the reallocation is cheap.
+      this.texture.dispose();
     }
 
     // Letterbox bars and the "screen off" state share this backdrop.

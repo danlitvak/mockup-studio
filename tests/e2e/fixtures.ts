@@ -97,6 +97,34 @@ export const phoneScreenshot = (): Buffer => makePng({ width: 540, height: 1170 
 /** A landscape capture, for testing `contain` against portrait devices. */
 export const wideScreenshot = (): Buffer => makePng({ width: 1280, height: 720 });
 
+/**
+ * A capture with a centred square drawn on it, for proving the media is not
+ * distorted once it has been through the renderer.
+ *
+ * "Does the media fill the screen" cannot catch stretching: media drawn with
+ * `cover` fills the screen whether or not its aspect survived the trip. A shape
+ * that is known to be square at the source can — if it comes back out square,
+ * the aspect ratio was preserved end to end.
+ *
+ * The marker is magenta on purpose. The device bodies, the traffic lights on
+ * the browser frame and the gradient backdrop are all either desaturated or
+ * red/yellow/green, and antialiased edges of the red traffic light otherwise
+ * land close enough to a red marker to widen its measured bounding box.
+ */
+export const MARKER_RGB: [number, number, number] = [240, 20, 240];
+
+export function squareMarkerScreenshot(width = 1280, height = 720, marker = 300): Buffer {
+  const halfMarker = marker / 2;
+  return makePng({
+    width,
+    height,
+    paint: (x, y) =>
+      Math.abs(x - width / 2) < halfMarker && Math.abs(y - height / 2) < halfMarker
+        ? MARKER_RGB
+        : [18, 18, 22],
+  });
+}
+
 /** Container sniffing, so export tests assert on real bytes not just size. */
 export function detectContainer(bytes: Buffer): 'mp4' | 'webm' | 'png' | 'unknown' {
   if (bytes.length >= 8) {

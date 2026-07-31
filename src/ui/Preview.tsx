@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ASPECT_RATIOS } from '../core/framing.ts';
 import { effectiveDuration } from '../core/project.ts';
 import { Stage } from '../render/stage.ts';
@@ -23,6 +23,18 @@ export function Preview(): React.JSX.Element {
   const hasMedia = useStudio((state) => state.media !== null);
   const mediaLoading = useStudio((state) => state.mediaLoading);
   const isTransparent = useStudio((state) => state.project.scene.background.kind === 'transparent');
+  const playing = useStudio((state) => state.playing);
+  const exporting = useStudio((state) => state.exportJob !== null);
+
+  const togglePlayback = useCallback(() => {
+    const state = useStudio.getState();
+    // Playback is suspended for the whole of an export — those frames come from
+    // a separate deterministic loop — so a stray click must not restart it. The
+    // check reads the store rather than the subscribed flag above so a click
+    // landing before React has re-rendered is still ignored.
+    if (state.exportJob) return;
+    state.setPlaying(!state.playing);
+  }, []);
 
   // Create the stage once and tear it down with the component.
   useEffect(() => {
@@ -111,10 +123,27 @@ export function Preview(): React.JSX.Element {
   return (
     <div className="preview">
       <div className="preview__frame" ref={frameRef}>
+        {/*
+          The canvas is the play/pause target, like the picture in any video
+          player. The dropzone and the loading overlay both sit on top of it, so
+          a click meant for them never reaches this handler.
+        */}
         <canvas
           ref={canvasRef}
           className={isTransparent ? 'preview__canvas preview__canvas--checker' : 'preview__canvas'}
           data-testid="preview-canvas"
+          role="button"
+          tabIndex={0}
+          aria-label={playing ? 'Pause preview' : 'Play preview'}
+          aria-disabled={exporting}
+          onClick={togglePlayback}
+          onKeyDown={(event) => {
+            // Space is already toggled globally in App, and claiming it here as
+            // well would flip playback twice and look like nothing happened.
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            togglePlayback();
+          }}
         />
         {!hasMedia && !mediaLoading && <Dropzone />}
         {mediaLoading && (
