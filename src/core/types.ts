@@ -48,6 +48,9 @@ export interface Background {
   angle: number;
 }
 
+/** What is cut out of the top of a phone screen. */
+export type ScreenCutout = 'none' | 'notch' | 'island';
+
 export interface SceneSettings {
   device: DeviceId;
   /** Device body colour, `#rrggbb`. */
@@ -68,8 +71,37 @@ export interface SceneSettings {
   shadow: boolean;
   /** 0..1 */
   shadowStrength: number;
-  /** Ambient/environment light intensity, 0..2. */
+  /** 0 is a tight contact shadow, 1 a wide diffuse one. */
+  shadowSoftness: number;
+
+  /* Lighting. The rig is derived from one angle — see core/lighting.ts. */
+
+  /** Overall light level, 0..2. Scales every lamp in the rig. */
   lightIntensity: number;
+  /** Where the key light sits around the device, in degrees. */
+  lightAngle: number;
+  /** How high the key light sits, in degrees. */
+  lightElevation: number;
+  /** -1 cool, 0 neutral, 1 warm. */
+  lightWarmth: number;
+  /** Lifts the shaded side of the device, 0..2. */
+  fillIntensity: number;
+  /** How much of the surround the body reflects, 0..2. */
+  reflectionIntensity: number;
+  /** Sky/environment fill, 0..2. */
+  ambientIntensity: number;
+
+  /* Materials. */
+
+  /** How metallic the body reads, 0..1. */
+  bodyMetalness: number;
+  /** 0 is a mirror, 1 is matte. */
+  bodyRoughness: number;
+  /** Strength of the glass sheen across the screen, 0..1. */
+  screenGlare: number;
+
+  /** Only drawn on devices whose spec has a cutout. */
+  screenCutout: ScreenCutout;
 }
 
 export type MotionMode = 'preset' | 'keyframes';

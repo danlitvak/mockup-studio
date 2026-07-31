@@ -23,7 +23,9 @@ A personal, local-first take on [freemockup.video](https://www.freemockup.video/
 | Import | PNG, JPEG, WebP, AVIF, GIF, MP4, WebM — drag anywhere or pick a file |
 | Devices | Phone, tablet, laptop, browser window, bare screen — all generated procedurally, no model assets |
 | Fit | `Fill` crops to the screen, `Contain` letterboxes — defaults per device shape |
-| Scene | Body colour, scale, three rotation axes, X/Y offset, drop shadow, light intensity |
+| Scene | Body colour, scale, three rotation axes, X/Y offset, drop shadow with strength and softness |
+| Light | Brightness, direction, height, warmth, fill, ambient and reflections — one coherent rig |
+| Material | Metalness, roughness, glass sheen on the screen, and the phone cutout (island, notch or none) |
 | Background | Gradient (any angle), solid, or transparent, plus six presets |
 | Motion | `still`, `float`, `spin`, `orbit`, `pan` (seamless loops) and `tilt-in`, `push-in`, `flip-in` (one-shot intros) — or keyframe your own |
 | Keyframes | Poses at chosen times, five easings, seamless wrap; markers on the timeline |
@@ -67,8 +69,9 @@ npm run test:e2e     # end-to-end in real Chromium (Playwright)
 npm run check        # all of the above, in order
 ```
 
-**283 unit tests** cover the pure core — motion, keyframes, framing, fit, device geometry, gradients,
-saved presets, project migration, export planning. **49 end-to-end tests** drive a real browser: they read pixels back off
+**301 unit tests** cover the pure core — motion, keyframes, framing, fit, device geometry, lighting,
+gradients, saved presets, project migration, export planning. **57 end-to-end tests** drive a real
+browser: they read pixels back off
 the WebGL canvas to prove the scene actually changed, and they encode real video files and decode
 them again to check dimensions and duration. The encode test runs once per container, so H.264 is
 exercised wherever the browser has an encoder for it rather than always deferring to VP9; for MP4 the
@@ -105,6 +108,7 @@ src/
     project.ts      Defaults, tolerant migration, clamping
     motion.ts       evaluateMotion(motion, scene, t) -> Transform
     keyframes.ts    Keyframe track sampling, easings, seamless wrap
+    lighting.ts     Light rig placement, intensities and warmth
     presets.ts      Saved motion configurations
     framing.ts      Aspect/resolution maths, camera fit, frame timing
     devices.ts      Device geometry specs

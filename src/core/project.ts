@@ -19,6 +19,7 @@ import type {
   QualityId,
   ResolutionId,
   SceneSettings,
+  ScreenCutout,
   OutputSettings,
 } from './types.ts';
 
@@ -65,6 +66,13 @@ export const hexColor = (v: unknown, fallback: string): string => {
   return fallback;
 };
 
+/** Bring any angle into [0, 360). Periodic, so it wraps rather than clamping. */
+const wrapDegrees = (v: unknown, fallback: number): number => {
+  const n = typeof v === 'number' ? v : Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return ((n % 360) + 360) % 360;
+};
+
 const nearestFps = (v: unknown): number => {
   const n = typeof v === 'number' ? v : Number(v);
   if (!Number.isFinite(n)) return 30;
@@ -105,7 +113,20 @@ export const defaultScene = (): SceneSettings => ({
   rotationZ: 0,
   shadow: true,
   shadowStrength: 0.55,
+  shadowSoftness: 0.5,
   lightIntensity: 1,
+  // The default angle and elevation reproduce the fixed rig the scene used
+  // before the lights could be aimed, so existing projects look unchanged.
+  lightAngle: 27,
+  lightElevation: 31,
+  lightWarmth: 0,
+  fillIntensity: 1,
+  reflectionIntensity: 1,
+  ambientIntensity: 1,
+  bodyMetalness: 0.55,
+  bodyRoughness: 0.38,
+  screenGlare: 0.2,
+  screenCutout: 'island',
 });
 
 export const defaultMotion = (): MotionSettings => ({
@@ -172,7 +193,24 @@ function migrateScene(raw: unknown): SceneSettings {
     rotationZ: num(raw.rotationZ, d.rotationZ, -180, 180),
     shadow: bool(raw.shadow, d.shadow),
     shadowStrength: num(raw.shadowStrength, d.shadowStrength, 0, 1),
+    shadowSoftness: num(raw.shadowSoftness, d.shadowSoftness, 0, 1),
     lightIntensity: num(raw.lightIntensity, d.lightIntensity, 0, 2),
+    // Wrapped rather than clamped: an angle is periodic, so 370 degrees is 10,
+    // not "as far round as you are allowed to go".
+    lightAngle: wrapDegrees(raw.lightAngle, d.lightAngle),
+    lightElevation: num(raw.lightElevation, d.lightElevation, -60, 85),
+    lightWarmth: num(raw.lightWarmth, d.lightWarmth, -1, 1),
+    fillIntensity: num(raw.fillIntensity, d.fillIntensity, 0, 2),
+    reflectionIntensity: num(raw.reflectionIntensity, d.reflectionIntensity, 0, 2),
+    ambientIntensity: num(raw.ambientIntensity, d.ambientIntensity, 0, 2),
+    bodyMetalness: num(raw.bodyMetalness, d.bodyMetalness, 0, 1),
+    bodyRoughness: num(raw.bodyRoughness, d.bodyRoughness, 0.02, 1),
+    screenGlare: num(raw.screenGlare, d.screenGlare, 0, 1),
+    screenCutout: oneOf<ScreenCutout>(
+      raw.screenCutout,
+      ['none', 'notch', 'island'] as const,
+      d.screenCutout,
+    ),
   };
 }
 

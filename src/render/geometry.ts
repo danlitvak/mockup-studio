@@ -149,21 +149,118 @@ export function roundedPlaneGeometry(
   return geometry;
 }
 
-/** A soft radial blob used as a contact shadow behind the device. */
-export function createShadowTexture(): THREE.CanvasTexture {
+/**
+ * A radial blob used as a contact shadow behind the device.
+ *
+ * `softness` runs 0 to 1. At 0 the blob holds full opacity most of the way out
+ * before falling off quickly, which reads as a tight shadow cast onto a surface
+ * just behind the device; at 1 it fades from the middle, which reads as a wide
+ * ambient one. Doing this in the texture rather than only by scaling the mesh is
+ * what makes a hard shadow actually look hard — a stretched soft gradient just
+ * looks like a bigger smudge.
+ */
+export function createShadowTexture(softness = 0.5): THREE.CanvasTexture {
   const size = 256;
+  const s = Math.min(1, Math.max(0, softness));
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (ctx) {
     const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    gradient.addColorStop(0, 'rgba(0,0,0,0.85)');
-    gradient.addColorStop(0.45, 'rgba(0,0,0,0.42)');
-    gradient.addColorStop(0.75, 'rgba(0,0,0,0.12)');
+    // The core has to reach past the device's own silhouette. The device sits in
+    // front of the middle of this blob and hides it, so a core that stops early
+    // puts every dark pixel exactly where nobody can see it — which is what made
+    // the strongest setting still look like almost nothing.
+    const core = 0.68 - 0.28 * s;
+    gradient.addColorStop(0, 'rgba(0,0,0,1)');
+    gradient.addColorStop(core, 'rgba(0,0,0,0.95)');
+    gradient.addColorStop(core + (1 - core) * 0.38, `rgba(0,0,0,${(0.5 - 0.12 * s).toFixed(3)})`);
+    gradient.addColorStop(core + (1 - core) * 0.72, 'rgba(0,0,0,0.16)');
     gradient.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * A studio-like surround for metals to reflect.
+ *
+ * Without one, a metallic material reflects an environment that is not there and
+ * comes out black — so turning the metalness up, which should make a device look
+ * more like metal, instead made it disappear. This is an equirectangular
+ * gradient: bright overhead, mid at the horizon, dark below, with one soft
+ * highlight standing in for a key light source.
+ */
+export function createEnvironmentTexture(): THREE.CanvasTexture {
+  const width = 512;
+  const height = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const sky = ctx.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0, '#ffffff');
+    sky.addColorStop(0.4, '#c8ced8');
+    sky.addColorStop(0.52, '#6d7480');
+    sky.addColorStop(0.78, '#2b2f36');
+    sky.addColorStop(1, '#15171b');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, width, height);
+
+    // A broad soft light above and to one side, so a polished body picks up a
+    // highlight that moves as it turns rather than reading as flat grey.
+    const glow = ctx.createRadialGradient(
+      width * 0.32,
+      height * 0.22,
+      0,
+      width * 0.32,
+      height * 0.22,
+      height * 0.5,
+    );
+    glow.addColorStop(0, 'rgba(255,255,255,0.95)');
+    glow.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * A diagonal sheen laid over the screen, standing in for a reflection in glass.
+ *
+ * Drawn as its own additive layer rather than by giving the screen a reflective
+ * material: the screen is deliberately unlit so the user's media comes out the
+ * colour they gave it, and a lit material would tint every export.
+ */
+export function createGlassTexture(): THREE.CanvasTexture {
+  const width = 256;
+  const height = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+    // A broad band running corner to corner, brightest along its own axis.
+    const gradient = ctx.createLinearGradient(0, height, width, 0);
+    gradient.addColorStop(0, 'rgba(255,255,255,0)');
+    gradient.addColorStop(0.42, 'rgba(255,255,255,0)');
+    gradient.addColorStop(0.58, 'rgba(255,255,255,0.5)');
+    gradient.addColorStop(0.72, 'rgba(255,255,255,0.16)');
+    gradient.addColorStop(0.78, 'rgba(255,255,255,0.42)');
+    gradient.addColorStop(0.92, 'rgba(255,255,255,0)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

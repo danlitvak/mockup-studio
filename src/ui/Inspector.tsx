@@ -13,6 +13,7 @@ import type {
   MotionMode,
   QualityId,
   ResolutionId,
+  ScreenCutout,
 } from '../core/types.ts';
 import { ColorInput, Panel, Segmented, Select, Slider, Toggle } from './controls.tsx';
 import { ExportPanel } from './ExportPanel.tsx';
@@ -234,25 +235,152 @@ export function Inspector(): React.JSX.Element {
           onChange={(shadow) => patchScene({ shadow })}
         />
         {scene.shadow && (
-          <Slider
-            label="Shadow strength"
-            value={scene.shadowStrength}
-            min={0}
-            max={1}
-            step={0.01}
-            format={(v) => `${Math.round(v * 100)}%`}
-            onChange={(shadowStrength) => patchScene({ shadowStrength })}
-          />
+          <>
+            <Slider
+              label="Shadow strength"
+              value={scene.shadowStrength}
+              min={0}
+              max={1}
+              step={0.01}
+              testId="shadow-strength"
+              format={(v) => `${Math.round(v * 100)}%`}
+              onChange={(shadowStrength) => patchScene({ shadowStrength })}
+            />
+            <Slider
+              label="Shadow softness"
+              value={scene.shadowSoftness}
+              min={0}
+              max={1}
+              step={0.01}
+              testId="shadow-softness"
+              format={(v) => (v < 0.34 ? 'Tight' : v < 0.67 ? 'Medium' : 'Diffuse')}
+              onChange={(shadowSoftness) => patchScene({ shadowSoftness })}
+            />
+          </>
         )}
+      </Panel>
+
+      <Panel title="Light">
         <Slider
-          label="Light"
+          label="Brightness"
           value={scene.lightIntensity}
           min={0}
           max={2}
           step={0.01}
+          testId="light-intensity"
           format={(v) => `${Math.round(v * 100)}%`}
           onChange={(lightIntensity) => patchScene({ lightIntensity })}
         />
+        <Slider
+          label="Direction"
+          value={scene.lightAngle}
+          min={0}
+          max={359}
+          step={1}
+          testId="light-angle"
+          format={(v) => `${Math.round(v)}°`}
+          onChange={(lightAngle) => patchScene({ lightAngle })}
+        />
+        <Slider
+          label="Height"
+          value={scene.lightElevation}
+          min={-60}
+          max={85}
+          step={1}
+          testId="light-elevation"
+          format={(v) => `${Math.round(v)}°`}
+          onChange={(lightElevation) => patchScene({ lightElevation })}
+        />
+        <Slider
+          label="Warmth"
+          value={scene.lightWarmth}
+          min={-1}
+          max={1}
+          step={0.01}
+          testId="light-warmth"
+          format={(v) => (v < -0.05 ? 'Cool' : v > 0.05 ? 'Warm' : 'Neutral')}
+          onChange={(lightWarmth) => patchScene({ lightWarmth })}
+        />
+        <Slider
+          label="Fill"
+          value={scene.fillIntensity}
+          min={0}
+          max={2}
+          step={0.01}
+          testId="light-fill"
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(fillIntensity) => patchScene({ fillIntensity })}
+        />
+        <Slider
+          label="Ambient"
+          value={scene.ambientIntensity}
+          min={0}
+          max={2}
+          step={0.01}
+          testId="light-ambient"
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(ambientIntensity) => patchScene({ ambientIntensity })}
+        />
+        <Slider
+          label="Reflections"
+          value={scene.reflectionIntensity}
+          min={0}
+          max={2}
+          step={0.01}
+          testId="light-reflections"
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(reflectionIntensity) => patchScene({ reflectionIntensity })}
+        />
+        <p className="panel__note">
+          The fill follows the direction, so the whole rig turns together.
+          Reflections matter most on a metallic body.
+        </p>
+      </Panel>
+
+      <Panel title="Material">
+        <Slider
+          label="Metallic"
+          value={scene.bodyMetalness}
+          min={0}
+          max={1}
+          step={0.01}
+          testId="body-metalness"
+          format={(v) => `${Math.round(v * 100)}%`}
+          onChange={(bodyMetalness) => patchScene({ bodyMetalness })}
+        />
+        <Slider
+          label="Roughness"
+          value={scene.bodyRoughness}
+          min={0.02}
+          max={1}
+          step={0.01}
+          testId="body-roughness"
+          format={(v) => (v < 0.2 ? 'Polished' : v < 0.6 ? 'Satin' : 'Matte')}
+          onChange={(bodyRoughness) => patchScene({ bodyRoughness })}
+        />
+        <Slider
+          label="Screen glass"
+          value={scene.screenGlare}
+          min={0}
+          max={1}
+          step={0.01}
+          testId="screen-glare"
+          format={(v) => (v === 0 ? 'Off' : `${Math.round(v * 100)}%`)}
+          onChange={(screenGlare) => patchScene({ screenGlare })}
+        />
+        {getDevice(scene.device).hasNotch && (
+          <Segmented<ScreenCutout>
+            label="Cutout"
+            value={scene.screenCutout}
+            testId="screen-cutout"
+            options={[
+              { value: 'island', label: 'Island' },
+              { value: 'notch', label: 'Notch' },
+              { value: 'none', label: 'None' },
+            ]}
+            onChange={(screenCutout) => patchScene({ screenCutout })}
+          />
+        )}
       </Panel>
 
       <Panel title="Motion">
