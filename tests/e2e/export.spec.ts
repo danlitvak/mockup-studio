@@ -1,11 +1,20 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { detectContainer, phoneScreenshot } from './fixtures.ts';
+import { detectContainer, mp4VideoTrack, phoneScreenshot } from './fixtures.ts';
 import { openApp, snapshot, waitForMedia } from './helpers.ts';
 
 type Format = 'mp4' | 'webm';
 
-/** Prefer whichever container this browser can actually encode. */
+const FORMATS: Format[] = ['mp4', 'webm'];
+
+/**
+ * Prefer whichever container this browser can actually encode.
+ *
+ * Only for tests that are about something other than the codec — WebM is the
+ * safe default because it is available essentially everywhere. The encode tests
+ * below deliberately do *not* use this: they run once per container so H.264 is
+ * genuinely exercised wherever it exists, rather than always losing to WebM.
+ */
 const pickFormat = (support: { mp4: boolean; webm: boolean }): Format =>
   support.webm ? 'webm' : 'mp4';
 
@@ -56,75 +65,94 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('export', () => {
-  test('renders and encodes a real video file', async ({ page }) => {
-    const support = await encodableFormats(page);
-    const format = pickFormat(support);
-    test.skip(!support.webm && !support.mp4, 'no video encoder available in this browser');
+  for (const format of FORMATS) {
+    test(`renders and encodes a real ${format.toUpperCase()} file`, async ({ page }) => {
+      const support = await encodableFormats(page);
+      test.skip(
+        !support[format],
+        `this browser has no ${format.toUpperCase()} encoder — the unsupported path is covered separately`,
+      );
 
-    await importScreenshot(page);
-    await useFastOutput(page, format);
+      await importScreenshot(page);
+      await useFastOutput(page, format);
 
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(error.message));
 
-    const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
-    await page.getByTestId('export-video').click();
-    await expect(page.getByTestId('export-progress')).toBeVisible();
+      const downloadPromise = page.waitForEvent('download', { timeout: 120_000 });
+      await page.getByTestId('export-video').click();
+      await expect(page.getByTestId('export-progress')).toBeVisible();
 
-    const download = await downloadPromise;
-    const path = await download.path();
-    expect(path, 'the export should produce a file on disk').toBeTruthy();
+      const download = await downloadPromise;
+      const path = await download.path();
+      expect(path, 'the export should produce a file on disk').toBeTruthy();
 
-    const bytes = await readFile(path);
-    expect(detectContainer(bytes), 'the file should be a real container').toBe(format);
-    expect(bytes.length, 'a 1s clip should not be a stub').toBeGreaterThan(2000);
-    expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${format}$`));
+      const bytes = await readFile(path);
+      expect(detectContainer(bytes), 'the file should be a real container').toBe(format);
+      expect(bytes.length, 'a 1s clip should not be a stub').toBeGreaterThan(2000);
+      expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${format}$`));
 
-    // A container header is not proof of a playable file — decode it.
-    const decoded = await page.evaluate(async (base64) => {
-      const binary = atob(base64);
-      const buffer = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) buffer[i] = binary.charCodeAt(i);
-      const url = URL.createObjectURL(new Blob([buffer]));
-      const video = document.createElement('video');
-      video.src = url;
-      video.muted = true;
+      // A container header is not proof of a playable file — decode it.
+      const decoded = await page.evaluate(async (base64) => {
+        const binary = atob(base64);
+        const buffer = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i += 1) buffer[i] = binary.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([buffer]));
+        const video = document.createElement('video');
+        video.src = url;
+        video.muted = true;
 
-      const result = await new Promise<{
-        width: number;
-        height: number;
-        duration: number;
-      } | null>((resolve) => {
-        const timer = setTimeout(() => resolve(null), 20_000);
-        video.addEventListener('loadeddata', () => {
-          clearTimeout(timer);
-          resolve({
-            width: video.videoWidth,
-            height: video.videoHeight,
-            duration: video.duration,
+        const result = await new Promise<{
+          width: number;
+          height: number;
+          duration: number;
+        } | null>((resolve) => {
+          const timer = setTimeout(() => resolve(null), 20_000);
+          video.addEventListener('loadeddata', () => {
+            clearTimeout(timer);
+            resolve({
+              width: video.videoWidth,
+              height: video.videoHeight,
+              duration: video.duration,
+            });
+          });
+          video.addEventListener('error', () => {
+            clearTimeout(timer);
+            resolve(null);
           });
         });
-        video.addEventListener('error', () => {
-          clearTimeout(timer);
-          resolve(null);
-        });
-      });
 
-      URL.revokeObjectURL(url);
-      return result;
-    }, bytes.toString('base64'));
+        URL.revokeObjectURL(url);
+        return result;
+      }, bytes.toString('base64'));
 
-    expect(decoded, 'the exported file should decode').not.toBeNull();
-    expect(decoded!.width).toBe(1280);
-    expect(decoded!.height).toBe(720);
-    // 24 frames at 24fps, allowing for container timestamp rounding.
-    expect(decoded!.duration).toBeGreaterThan(0.7);
-    expect(decoded!.duration).toBeLessThan(1.4);
+      expect(decoded, 'the exported file should decode').not.toBeNull();
+      expect(decoded!.width).toBe(1280);
+      expect(decoded!.height).toBe(720);
+      // 24 frames at 24fps, allowing for container timestamp rounding.
+      expect(decoded!.duration).toBeGreaterThan(0.7);
+      expect(decoded!.duration).toBeLessThan(1.4);
 
-    expect(errors).toEqual([]);
-    await expect(page.getByTestId('toast')).toContainText('1280×720');
-    await expect(page.getByTestId('toast')).toContainText('24 frames');
-  });
+      // For MP4, go further than "it decoded": read the track out of the
+      // container. A file can play and still carry the wrong codec, or hold a
+      // frame count that quietly disagrees with the requested fps.
+      if (format === 'mp4') {
+        const track = mp4VideoTrack(bytes);
+        expect(track, 'the MP4 should contain a video track').not.toBeNull();
+        expect(track!.codec, 'MP4 export must be H.264').toBe('avc1');
+        expect(track!.profile).not.toBeNull();
+        expect(track!.width).toBe(1280);
+        expect(track!.height).toBe(720);
+        // 1s at 24fps, and every frame written exactly once.
+        expect(track!.samples).toBe(24);
+        expect(track!.duration).toBeCloseTo(1, 1);
+      }
+
+      expect(errors).toEqual([]);
+      await expect(page.getByTestId('toast')).toContainText('1280×720');
+      await expect(page.getByTestId('toast')).toContainText('24 frames');
+    });
+  }
 
   test('exports a vertical 4K clip at the right dimensions', async ({ page }) => {
     const support = await encodableFormats(page);

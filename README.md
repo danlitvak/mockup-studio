@@ -66,9 +66,11 @@ npm run check        # all of the above, in order
 ```
 
 **226 unit tests** cover the pure core — motion, framing, fit, gradients, project migration, export
-planning. **28 end-to-end tests** drive a real browser: they read pixels back off the WebGL canvas to
+planning. **29 end-to-end tests** drive a real browser: they read pixels back off the WebGL canvas to
 prove the scene actually changed, and they encode real video files and decode them again to check
-dimensions and duration.
+dimensions and duration. The encode test runs once per container, so H.264 is exercised wherever the
+browser has an encoder for it rather than always deferring to VP9; for MP4 the suite also walks the
+container's boxes to confirm the track really is `avc1` and holds exactly the expected frame count.
 
 Three properties worth calling out, because they are the ones that are easy to get subtly wrong:
 
@@ -116,7 +118,11 @@ consumes values that were already computed and checked.
 - **H.264 support varies.** Some Chromium builds ship without a proprietary encoder. The app probes
   `VideoEncoder.isConfigSupported` for the chosen container *and* frame size, marks unavailable
   formats in the UI, and offers a one-click switch instead of failing after a long render. VP9/WebM
-  is available essentially everywhere.
+  is available essentially everywhere. Where H.264 *is* present, MP4 export is verified end to end:
+  a 1080p30 clip comes out as High profile level 4.0 with one sample per frame and an exact duration.
+  Note that the level in a codec string is part of the question — `avc1.42001f` is level 3.1 and
+  cannot express 1080p, so probing with it reports a false negative on a machine that supports H.264
+  perfectly well.
 - **Transparent backgrounds.** Video has no alpha channel here, so a transparent background exports
   as black. Use the PNG frame export to keep transparency. The UI says so in place.
 - **Export is slower than realtime**, deliberately — see above. A 5s 1080p clip takes a few seconds;
